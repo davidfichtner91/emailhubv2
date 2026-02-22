@@ -86,17 +86,6 @@ body::after { content: ''; position: fixed; inset: 0; opacity: 0.025; background
 .card-body { padding: 16px; }
 .sbar { width: 3px; min-height: 16px; border-radius: 4px; background: var(--sc, var(--accent)); flex-shrink: 0; }
 
-/* ── API KEY HIGHLIGHT ───────────────────────── */
-.api-key-row {
-  background: rgba(61,110,255,0.06); border: 1px solid rgba(61,110,255,0.2);
-  border-radius: 10px; padding: 14px 16px; margin-bottom: 14px;
-}
-.api-key-label-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.api-key-label-row .field-label { color: var(--accent); font-size: 10px; }
-.api-key-status { font-size: 10px; margin-left: auto; padding: 2px 8px; border-radius: 4px; }
-.api-key-status.set { background: var(--green-dim); color: var(--green); }
-.api-key-status.missing { background: var(--red-dim); color: var(--red); }
-
 /* ── FORM ────────────────────────────────────── */
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
@@ -572,7 +561,7 @@ const REGIONS = [
   { id:'de', label:'DE', flag:'🇩🇪', color:'var(--de)' },
 ];
 
-function defCfg() { return { senderName:'', senderEmail:'', replyTo:'', apiKey:'', lists:[], vipLists:[], header:'', footer:'', textColor:'#444444', bodyBg:'#ffffff', fontFamily:'Inter' }; }
+function defCfg() { return { senderName:'', senderEmail:'', replyTo:'', header:'', footer:'', textColor:'#444444', bodyBg:'#ffffff', fontFamily:'Inter' }; }
 
 // Migrate old single-listId configs to arrays
 function migrateCfg(cfg) {
@@ -1143,13 +1132,6 @@ function switchTmpl(id) {
   });
 }
 
-function updateApiStatus(storeId) {
-  const val = document.getElementById(`sc-${storeId}-apiKey`).value.trim();
-  const el = document.getElementById(`api-status-${storeId}`);
-  if (!el) return;
-  el.className = `api-key-status ${val ? 'set' : 'missing'}`;
-  el.textContent = val ? '✅ Set' : '⚠️ Missing — required to push campaigns';
-}
 
 function setGlobalFont(font) {
   globalFont = font.trim();
@@ -1584,9 +1566,8 @@ function openOutput() {
     </button>`).join('');
 
   document.getElementById('outBody').innerHTML = items.map((it,i) => {
-    const em = generated[it.key];
+    const em  = generated[it.key];
     const cfg = storeCfgs[it.store.id];
-    const hasKey = !!cfg.apiKey;
     return `<div class="out-sec ${i===0?'active':''}" id="osec-${it.key}">
       ${it.isVip?`<div style="background:var(--vip-dim);border:1px solid rgba(192,132,252,0.2);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:var(--vip);">⭐ VIP Campaign — different links, subject & list ID</div>`:''}
       <div class="meta-grid">
@@ -1595,14 +1576,14 @@ function openOutput() {
         <div class="mp"><div class="mp-l">From</div><div class="mp-v">${cfg.senderName||'—'}</div></div>
         <div class="mp"><div class="mp-l">Sender email</div><div class="mp-v">${cfg.senderEmail||'—'}</div></div>
         <div class="mp"><div class="mp-l">List IDs</div><div class="mp-v">${it.isVip ? (em.vipListIds||[]).join(', ')||'—' : (cfg.lists||[]).join(', ')||'—'}</div></div>
-        <div class="mp"><div class="mp-l">API Key</div><div class="mp-v">${hasKey?'✅ Set':'⚠️ Missing'}</div></div>
+        <div class="mp"><div class="mp-l">Reply-To</div><div class="mp-v">${cfg.replyTo||cfg.senderEmail||'—'}</div></div>
       </div>
       <div style="display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
         <button class="btn btn-ghost btn-sm" onclick="copyHtml('${it.key}')">📋 Copy HTML</button>
         <button class="btn btn-ghost btn-sm" onclick="dlHtml('${it.key}')">⬇️ Download</button>
         <button class="btn btn-ghost btn-sm" onclick="toggleCode('${it.key}')">👨‍💻 Code</button>
         <button class="btn ${it.isVip?'btn-vip':'btn-green'} btn-sm" id="pbtn-${it.key}" onclick="pushKlaviyo('${it.key}')">
-          ${hasKey?(it.isVip?'⭐ Push VIP':'🚀 Push to Klaviyo'):'🔑 Add API key first'}
+          ${it.isVip ? '⭐ Push VIP' : '🚀 Push to Klaviyo'}
         </button>
         <span id="pst-${it.key}" style="font-size:11px;color:var(--muted);"></span>
       </div>
@@ -1686,8 +1667,6 @@ async function pushAll() {
   btn.disabled = true;
   let done = 0, failed = 0;
   for (const key of keys) {
-    const cfg = storeCfgs[generated[key].store.id];
-    if (!cfg.apiKey) { failed++; continue; }
     status.textContent = `Pushing ${done + failed + 1} / ${keys.length}…`;
     try {
       await pushKlaviyo(key);
@@ -1698,7 +1677,7 @@ async function pushAll() {
     await new Promise(r => setTimeout(r, 400)); // brief pause between API calls
   }
   btn.disabled = false;
-  status.textContent = `${done} pushed${failed ? ` · ${failed} skipped (no API key)` : ''}`;
+  status.textContent = `${done} pushed${failed ? ` · ${failed} failed` : ''}`;
   status.style.color = failed ? 'var(--amber)' : 'var(--green)';
 }
 

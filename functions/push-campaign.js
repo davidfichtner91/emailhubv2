@@ -2,7 +2,6 @@
 // Runs server-side on Netlify — API keys never reach the browser
 
 exports.handler = async (event) => {
-  // Only allow POST
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
@@ -14,14 +13,12 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) };
   }
 
-  const { storeId, campaignName, subject, preheader, senderName, senderEmail, replyTo, listIds, isVip } = payload;
+  const { storeId, campaignName, subject, preheader, senderName, senderEmail, replyTo, listIds } = payload;
 
   if (!storeId || !campaignName || !subject || !senderEmail) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields: storeId, campaignName, subject, senderEmail' }) };
   }
 
-  // API key is stored as a Netlify environment variable — never in the browser
-  // Variable name format: KLAVIYO_KEY_US, KLAVIYO_KEY_UK, KLAVIYO_KEY_CZ, etc.
   const envKey = `KLAVIYO_KEY_${storeId.toUpperCase()}`;
   const apiKey = process.env[envKey];
 
@@ -38,29 +35,32 @@ exports.handler = async (event) => {
       headers: {
         'Authorization': `Klaviyo-API-Key ${apiKey}`,
         'Content-Type': 'application/json',
-        'revision': '2024-02-15',
+        'revision': '2024-10-15',
       },
       body: JSON.stringify({
         data: {
           type: 'campaign',
           attributes: {
             name: campaignName,
-            channel: 'email',
             audiences: {
-              included: Array.isArray(listIds) ? listIds : (listIds ? [listIds] : []),
+              included: Array.isArray(listIds) && listIds.length ? listIds : [],
             },
-            send_options: { use_smart_sending: true },
-            tracking_options: { is_tracking_clicks: true, is_tracking_opens: true },
             send_strategy: { method: 'immediate' },
-            message: {
-              channel: 'email',
-              content: {
-                subject,
-                preview_text: preheader || '',
-                from_email: senderEmail,
-                from_label: senderName || '',
-                reply_to_email: replyTo || senderEmail,
-              },
+            campaign_messages: {
+              data: [{
+                type: 'campaign-message',
+                attributes: {
+                  channel: 'email',
+                  label: campaignName,
+                  content: {
+                    subject,
+                    preview_text: preheader || '',
+                    from_email: senderEmail,
+                    from_label: senderName || '',
+                    reply_to_email: replyTo || senderEmail,
+                  },
+                },
+              }],
             },
           },
         },
@@ -70,18 +70,13 @@ exports.handler = async (event) => {
     const data = await res.json();
 
     if (!res.ok) {
-      const errMsg = data?.errors?.[0]?.detail || data?.errors?.[0]?.title || `Klaviyo error ${res.status}`;
-      return { statusCode: res.status, body: JSON.stringify({ error: errMsg, klaviyoResponse: data }) };
+      const errMsg = data?.errors?.map(e => e.detail || e.title).join('; ') || `Klaviyo error ${res.status}`;
+      return { statusCode: res.status, body: JSON.stringify({ error: errMsg, debug: data }) };
     }
 
     return {
       statusCode: 200,
-      body: JSON.stringify({
-        success: true,
-        campaignId: data?.data?.id,
-        campaignName,
-        storeId,
-      }),
+      body: JSON.stringify({ success: true, campaignId: data?.data?.id, campaignName, storeId }),
     };
 
   } catch (err) {
