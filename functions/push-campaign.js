@@ -46,18 +46,20 @@ exports.handler = async (event) => {
               included: Array.isArray(listIds) && listIds.length ? listIds : [],
             },
             send_strategy: { method: 'immediate' },
-            campaign_messages: {
+            'campaign-messages': {
               data: [{
                 type: 'campaign-message',
                 attributes: {
-                  channel: 'email',
-                  label: campaignName,
-                  content: {
-                    subject,
-                    preview_text: preheader || '',
-                    from_email: senderEmail,
-                    from_label: senderName || '',
-                    reply_to_email: replyTo || senderEmail,
+                  definition: {
+                    channel: 'email',
+                    label: campaignName,
+                    content: {
+                      subject,
+                      preview_text: preheader || '',
+                      from_email: senderEmail,
+                      from_label: senderName || '',
+                      reply_to_email: replyTo || senderEmail,
+                    },
                   },
                 },
               }],
