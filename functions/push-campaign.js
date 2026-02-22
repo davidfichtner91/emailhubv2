@@ -16,27 +16,25 @@ exports.handler = async (event) => {
   const { storeId, campaignName, subject, preheader, senderName, senderEmail, replyTo, listIds } = payload;
 
   if (!storeId || !campaignName || !subject || !senderEmail) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields: storeId, campaignName, subject, senderEmail' }) };
+    return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) };
   }
 
   const envKey = `KLAVIYO_KEY_${storeId.toUpperCase()}`;
   const apiKey = process.env[envKey];
-
   if (!apiKey) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: `No API key configured for store "${storeId}". Add environment variable ${envKey} in Netlify.` })
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: `No API key configured for store "${storeId}". Add environment variable ${envKey} in Netlify.` }) };
   }
+
+  const headers = {
+    'Authorization': `Klaviyo-API-Key ${apiKey}`,
+    'Content-Type': 'application/json',
+    'revision': '2024-10-15',
+  };
 
   try {
     const res = await fetch('https://a.klaviyo.com/api/campaigns/', {
       method: 'POST',
-      headers: {
-        'Authorization': `Klaviyo-API-Key ${apiKey}`,
-        'Content-Type': 'application/json',
-        'revision': '2024-10-15',
-      },
+      headers,
       body: JSON.stringify({
         data: {
           type: 'campaign',
@@ -78,13 +76,15 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ success: true, campaignId: data?.data?.id, campaignName, storeId }),
+      body: JSON.stringify({
+        success: true,
+        campaignId: data?.data?.id,
+        campaignName,
+        storeId,
+      }),
     };
 
   } catch (err) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: `Server error: ${err.message}` }),
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: `Server error: ${err.message}` }) };
   }
 };
